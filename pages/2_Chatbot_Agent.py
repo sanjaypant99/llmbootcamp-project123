@@ -9,6 +9,9 @@ from langchain_community.callbacks.streamlit import StreamlitCallbackHandler
 from langchain.prompts import ChatPromptTemplate
 from langchain_community.utilities import BingSearchAPIWrapper
 from langchain_community.tools.bing_search import BingSearchResults
+from langchain_community.tools import WikipediaQueryRun
+
+from langchain_community.utilities import WikipediaAPIWrapper
 
 BING_SEARCH_URL = "https://api.bing.microsoft.com/v7.0/search"
 
@@ -24,7 +27,9 @@ class ChatbotTools:
     def setup_agent(self):
         # Check if Bing API key is available
         bing_subscription_key = os.getenv('BING_SUBSCRIPTION_KEY')
-        
+        wiki_agent = WikipediaQueryRun(api_wrapper = WikipediaAPIWrapper())
+        python_repl = PythonREPLTool()
+        arxiv = ArxivAPIWrapper()
         if bing_subscription_key:
             # Use BingSearch if API key is available
             bing_search = BingSearchAPIWrapper()
@@ -33,7 +38,22 @@ class ChatbotTools:
                     name="BingSearch",
                     func=bing_search.run,
                     description="Useful for when you need to answer questions about current events. You should ask targeted questions",
-                )
+                ),
+                Tool(
+                name="Wikipedia",
+                func=wiki_agent.run,
+                description="Useful for when you need to query about a specific topic, person, or event. You should ask targeted questions",
+            ),
+            Tool(
+                name="Python REPL",
+                func=python_repl.run,
+                description="A Python shell. Use this to execute python commands. Input should be a valid python command. If you expect output it should be printed out.",
+            ),
+            Tool(
+                name="Arxiv",
+                func=arxiv.run,
+                description="Useful for when you need to answer questions about research papers, scientific articles, and preprints etc",
+           )
             ]
         else:
             # Fallback to DuckDuckGo if Bing API key is not available
