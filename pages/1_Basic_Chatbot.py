@@ -4,12 +4,15 @@ from streaming import StreamHandler
 
 from langchain_openai import ChatOpenAI
 from langchain.chains import ConversationChain
+from langchain.memory import ConversationBufferMemory
 
 st.set_page_config(page_title="Chatbot", page_icon="💬")
 st.header('Basic Chatbot')
 st.write('Allows users to interact with the OpenAI LLMs')
 
-
+if "messages" not in st.session_state:
+    st.session_state["messages"] = []
+    
 class Basic:
 
     def __init__(self):
@@ -17,9 +20,14 @@ class Basic:
         self.openai_model = "gpt-4o-mini"
 
     def setup_chain(self):
-        llm = ChatOpenAI(model_name=self.openai_model,
-                     temperature=0, streaming=True)
-        chain = ConversationChain(llm=llm, verbose=True)
+        # Setup memory for contextual conversation
+        llm =ChatOpenAI(model_name=self.openai_model,
+                temperature=0, streaming=True)
+        memory = ConversationBufferMemory()
+        user = utils.join_messages(st.session_state.messages,'user')
+        assistant = utils.join_messages(st.session_state.messages, 'assistant')
+        memory.save_context({"input": user}, {"output": assistant})
+        chain = ConversationChain(llm=llm, memory = memory, verbose=True)
         return chain
 
     @utils.enable_chat_history
