@@ -10,6 +10,9 @@ from langchain.prompts import ChatPromptTemplate
 from langchain_community.utilities import BingSearchAPIWrapper
 from langchain_community.tools.bing_search import BingSearchResults
 from langchain_community.tools import WikipediaQueryRun
+from langchain_experimental.tools.python.tool import PythonREPLTool
+from langchain_community.utilities import ArxivAPIWrapper
+
 
 from langchain_community.utilities import WikipediaAPIWrapper
 
