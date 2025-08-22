@@ -1,87 +1,109 @@
-"""
-Streamlit Chat Interface Module
-
-This module provides chat functionality with history management and API key configuration 
-for OpenAI and Bing services.
-"""
-
-import os
-import random
+# utils.py
 import streamlit as st
-from PIL import Image
-
-# decorator
-
-
-def enable_chat_history(func):
-    if os.environ.get("OPENAI_API_KEY"):
-
-        # to clear chat history after swtching chatbot
-        current_page = func.__qualname__
-        if "current_page" not in st.session_state:
-            st.session_state["current_page"] = current_page
-        if st.session_state["current_page"] != current_page:
-            try:
-                st.cache_resource.clear()
-                del st.session_state["current_page"]
-                del st.session_state["messages"]
-            except:
-                pass
-
-        # to show chat history on ui
-        if "messages" not in st.session_state:
-            st.session_state["messages"] = [
-                {"role": "assistant", "content": "How can I help you?"}]
-        for msg in st.session_state["messages"]:
-            st.chat_message(msg["role"]).write(msg["content"])
-
-    def execute(*args, **kwargs):
-        func(*args, **kwargs)
-    return execute
-
-
-def display_msg(msg, author):
-    """Method to display message on the UI
-
-    Args:
-        msg (str): message to display
-        author (str): author of the message -user/assistant
-    """
-    st.session_state.messages.append({"role": author, "content": msg})
-    st.chat_message(author).write(msg)
-
+import os
 
 def configure_openai_api_key():
+    """Checks for OpenAI API key in environment variables or Streamlit secrets."""
+    api_key = None
+    try:
+        # Try Streamlit secrets first (recommended for Streamlit apps)
+        if hasattr(st, 'secrets') and 'OPENAI_API_KEY' in st.secrets:
+            api_key = st.secrets["OPENAI_API_KEY"]
+            os.environ["OPENAI_API_KEY"] = api_key # Set for openai client
+    except Exception:
+        pass
 
-    # st.sidebar.image("DSD logo.png", width=300)
-    # Open the image
-    image = Image.open("DSD logo.png")
+    # Fallback to environment variable
+    if not api_key:
+        api_key = os.getenv("OPENAI_API_KEY")
 
-    # Resize the image
-    new_image = image.resize((300, 300))
+    if not api_key:
+        st.error("❌ OpenAI API key (`OPENAI_API_KEY`) not found.")
+        st.info("Please set it in Streamlit Secrets or as an environment variable.")
+        st.stop() # Halts the app
+    return api_key
 
-    # Display the resized image in the sidebar
-    st.sidebar.image(new_image, width=300)
-    st.sidebar.markdown(
-    "#### <a href='https://datasciencedojo.com/' style='color:light-blue;'>Powered by Data Science Dojo</a>",
-    unsafe_allow_html=True
-     )
-    openai_api_key = st.sidebar.text_input(
-        label="OpenAI API Key",
-        type="password",
-        value=st.session_state['OPENAI_API_KEY'] if 'OPENAI_API_KEY' in st.session_state else '',
-        placeholder="sk-..."
-    )
+def configure_mcp_server():
+    """Gets the MCP server URL from Streamlit secrets or environment variables."""
+    mcp_url = None
+    try:
+        # Try Streamlit secrets first (recommended)
+        if hasattr(st, 'secrets') and 'MCP_SERVER_URL' in st.secrets:
+            mcp_url = st.secrets["MCP_SERVER_URL"]
+    except Exception:
+        pass # Secrets not configured or key not found
+
+    # Fallback to environment variable
+    if not mcp_url:
+        mcp_url = os.getenv("MCP_SERVER_URL")
+
+    # Do NOT use a hardcoded default. Require user configuration.
+    # The application logic will handle the case where mcp_url is None/empty.
+
+    return mcp_url # Returns None or the URL string
+
+def display_msg(message: str, role: str):
+    """Displays a message in the chat interface."""
+    # Using Streamlit's built-in chat_message for cleaner handling
+    if role in ["user", "assistant"]:
+        with st.chat_message(role):
+            st.markdown(message)
+    elif role == "system":
+        st.info(f"ℹ️ {message}")
+    elif role == "thinking":
+        # Using an empty chat message or st.info for transient states
+        # For simplicity, using st.info, but could be more sophisticated
+        st.info(f"🤔 {message}")
+    elif role == "reasoning":
+        st.info(f"💭 AI Reasoning: {message}")
+    elif role == "tool_execution":
+        st.info(f"🔧 Executing tool: {message}")
+    elif role == "tool_result":
+        # Use st.markdown for better formatting of results
+        st.markdown(f"**🔧 Tool Result:**\n\n```\n{message}\n```")
+        # Or if you want a custom styled box:
+        # st.markdown(f"""
+        # <div class="tool-result">
+        #     <strong>🔧 Tool Result:</strong><br>
+        #     <pre>{message}</pre>
+        # </div>
+        # """, unsafe_allow_html=True)
+    elif role == "error":
+        st.error(f"❌ {message}")
+
+def enable_chat_history(func):
+    """Decorator to enable chat history and clear button."""
+    def wrapper(*args, **kwargs):
+        # Clear chat button logic
+        if st.sidebar.button("🗑️ Clear Chat History"):
+            st.session_state.messages = []
+            st.rerun()
+        st.sidebar.markdown("---")
+
+        # Display chat messages from history at the start of the main area
+        # This needs to be inside the main area, not sidebar.
+        # The original code displayed messages *before* the input.
+        # This decorator approach places it inside the main function call.
+        # A simple loop is fine here.
+        # Note: The original display logic was intertwined with the message type.
+        # We'll iterate and call display_msg for each.
+        # However, 'thinking', 'reasoning', 'tool_execution' were transient.
+        # For history display, we might want to filter or format them differently.
+        # Let's keep it simple and display all stored messages.
+        # But thinking/reasoning might clutter history. Let's filter them out for history display.
+        # Actually, let's just display them as they are, using display_msg.
+        # The display_msg function handles the types.
+
+        # Display existing messages (this replaces the loop in the original main)
+        # Ensure this only runs inside the main chat container.
+        # The decorator places this before the main function logic.
+        for message in st.session_state.get("messages", []):
+             # Avoid re-displaying transient 'thinking' messages from previous runs if they lingered
+             if message["role"] not in ["thinking"]: # Exclude transient messages from history display
+                 display_msg(message["content"], message["role"])
 
 
-    if openai_api_key:
-        st.session_state['OPENAI_API_KEY'] = openai_api_key
-        os.environ['OPENAI_API_KEY'] = openai_api_key
-    else:
-        st.error("Please add your OpenAI API key to continue.")
-        st.stop()
-    return openai_api_key
-    
-def join_messages(role_list, role):
-    messages = [message["content"] for message in role_list if message["role"] == role]
-    return " ".join(messages)
+        # Execute the wrapped function (e.g., the main chat logic)
+        func(*args, **kwargs)
+
+    return wrapper
