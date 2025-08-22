@@ -15,7 +15,6 @@ unstructured==0.17.2
 python-dotenv==1.0.0
 chromadb==1.0.12
 ragas==0.2.15
-openai-agents==0.0.17
 mcp==1.9.3
 python-a2a==0.5.9
 langchain-chroma==0.2.4
